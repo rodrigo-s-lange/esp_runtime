@@ -36,7 +36,7 @@ static esp_runtime_state_t s_runtime = {0};
 static const esp_runtime_module_desc_t s_modules[ESP_RUNTIME_MODULE_COUNT] = {
     [ESP_RUNTIME_MODULE_BUTTON] = { "BUTTON", true, esp_button_init, esp_button_deinit, esp_button_is_initialized },
     [ESP_RUNTIME_MODULE_CAN] = { "CAN", false, esp_can_init, esp_can_deinit, esp_can_is_initialized },
-    [ESP_RUNTIME_MODULE_EASYLED] = { "EASYLED", false, esp_easyled_init, esp_easyled_deinit, esp_easyled_is_initialized },
+    [ESP_RUNTIME_MODULE_EASYLED] = { "EASYLED", true, esp_easyled_init, esp_easyled_deinit, esp_easyled_is_initialized },
     [ESP_RUNTIME_MODULE_GPIO] = { "GPIO", true, esp_gpio_init, esp_gpio_deinit, esp_gpio_is_initialized },
     [ESP_RUNTIME_MODULE_I2C_MASTER] = { "I2C_MASTER", false, esp_i2c_master_init, esp_i2c_master_deinit, esp_i2c_master_is_initialized },
     [ESP_RUNTIME_MODULE_KEYPAD] = { "KEYPAD", false, esp_keypad_init, esp_keypad_deinit, esp_keypad_is_initialized },
@@ -101,6 +101,12 @@ static esp_err_t register_at_commands(void)
     if (err != ESP_OK) return err;
     err = esp_at_register_cmd_example("AT+ESP", handle_at_runtime, "AT+ESP=BUTTON,ENABLE,TRUE,FALSE");
     if (err != ESP_OK) {
+        (void)esp_at_unregister_cmd("AT+ESP?");
+        return err;
+    }
+    err = esp_at_set_help_visible("AT+ESP", false);
+    if (err != ESP_OK) {
+        (void)esp_at_unregister_cmd("AT+ESP");
         (void)esp_at_unregister_cmd("AT+ESP?");
         return err;
     }
