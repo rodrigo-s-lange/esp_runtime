@@ -1,4 +1,4 @@
-# esp_runtime
+# esp-runtime
 
 Runtime manager for project components.
 
