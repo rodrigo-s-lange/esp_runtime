@@ -12,13 +12,14 @@
 #include "esp_i2c_master.h"
 #include "esp_keypad.h"
 #include "esp_ota.h"
+#include "esp_pca9685.h"
 #include "esp_rs485.h"
 #include "esp_scheduler.h"
 #include "esp_spi_master.h"
+#include "esp_stepper.h"
 #include "esp_st7789v2.h"
 #include "esp_storage.h"
 #include "esp_time.h"
-#include "esp_webterm.h"
 #include "esp_wifi_sta.h"
 
 #ifdef __cplusplus
@@ -34,13 +35,14 @@ typedef enum {
     ESP_RUNTIME_MODULE_I2C_MASTER,
     ESP_RUNTIME_MODULE_KEYPAD,
     ESP_RUNTIME_MODULE_OTA,
+    ESP_RUNTIME_MODULE_PCA9685,
     ESP_RUNTIME_MODULE_RS485,
     ESP_RUNTIME_MODULE_SCHEDULER,
     ESP_RUNTIME_MODULE_SPI_MASTER,
+    ESP_RUNTIME_MODULE_STEPPER,
     ESP_RUNTIME_MODULE_ST7789V2,
     ESP_RUNTIME_MODULE_STORAGE,
     ESP_RUNTIME_MODULE_TIME,
-    ESP_RUNTIME_MODULE_WEBTERM,
     ESP_RUNTIME_MODULE_WIFI_STA,
     ESP_RUNTIME_MODULE_COUNT,
 } esp_runtime_module_t;

@@ -22,12 +22,13 @@ Runtime manager for project components.
 - `esp_keypad.h`
 - `esp_time.h`
 - `esp_ota.h`
+- `esp_pca9685.h`
 - `esp_rs485.h`
 - `esp_scheduler.h`
 - `esp_spi_master.h`
+- `esp_stepper.h`
 - `esp_st7789v2.h`
 - `esp_storage.h`
-- `esp_webterm.h`
 - `esp_wifi_sta.h`
 
 ## API
@@ -52,13 +53,14 @@ Runtime manager for project components.
 - `I2C_MASTER`
 - `KEYPAD`
 - `OTA`
+- `PCA9685`
 - `RS485`
 - `SCHEDULER`
 - `SPI_MASTER`
+- `STEPPER`
 - `ST7789V2`
 - `STORAGE`
 - `TIME`
-- `WEBTERM`
 - `WIFI_STA`
 
 ## Notes

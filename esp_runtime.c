@@ -39,16 +39,17 @@ static const esp_runtime_module_desc_t s_modules[ESP_RUNTIME_MODULE_COUNT] = {
     [ESP_RUNTIME_MODULE_EASYLED] = { "EASYLED", true, esp_easyled_init, esp_easyled_deinit, esp_easyled_is_initialized },
     [ESP_RUNTIME_MODULE_ETHERNET] = { "ETHERNET", true, esp_ethernet_init, esp_ethernet_deinit, esp_ethernet_is_initialized },
     [ESP_RUNTIME_MODULE_GPIO] = { "GPIO", true, esp_gpio_init, esp_gpio_deinit, esp_gpio_is_initialized },
-    [ESP_RUNTIME_MODULE_I2C_MASTER] = { "I2C_MASTER", false, esp_i2c_master_init, esp_i2c_master_deinit, esp_i2c_master_is_initialized },
+    [ESP_RUNTIME_MODULE_I2C_MASTER] = { "I2C_MASTER", true, esp_i2c_master_init, esp_i2c_master_deinit, esp_i2c_master_is_initialized },
     [ESP_RUNTIME_MODULE_KEYPAD] = { "KEYPAD", false, esp_keypad_init, esp_keypad_deinit, esp_keypad_is_initialized },
     [ESP_RUNTIME_MODULE_OTA] = { "OTA", true, esp_ota_init, esp_ota_deinit, esp_ota_is_initialized },
+    [ESP_RUNTIME_MODULE_PCA9685] = { "PCA9685", true, esp_pca9685_init, esp_pca9685_deinit, esp_pca9685_is_initialized },
     [ESP_RUNTIME_MODULE_RS485] = { "RS485", false, esp_rs485_init, esp_rs485_deinit, esp_rs485_is_initialized },
     [ESP_RUNTIME_MODULE_SCHEDULER] = { "SCHEDULER", false, esp_scheduler_init, esp_scheduler_deinit, esp_scheduler_is_initialized },
     [ESP_RUNTIME_MODULE_SPI_MASTER] = { "SPI_MASTER", false, esp_spi_master_init, esp_spi_master_deinit, esp_spi_master_is_initialized },
+    [ESP_RUNTIME_MODULE_STEPPER] = { "STEPPER", true, esp_stepper_init, esp_stepper_deinit, esp_stepper_is_initialized },
     [ESP_RUNTIME_MODULE_ST7789V2] = { "ST7789V2", true, esp_st7789v2_init, esp_st7789v2_deinit, esp_st7789v2_is_initialized },
     [ESP_RUNTIME_MODULE_STORAGE] = { "STORAGE", true, esp_storage_init, esp_storage_deinit, esp_storage_is_initialized },
     [ESP_RUNTIME_MODULE_TIME] = { "TIME", true, esp_time_init, esp_time_deinit, esp_time_is_initialized },
-    [ESP_RUNTIME_MODULE_WEBTERM] = { "WEBTERM", true, esp_webterm_init, esp_webterm_deinit, esp_webterm_is_initialized },
     [ESP_RUNTIME_MODULE_WIFI_STA] = { "WIFI_STA", true, esp_wifi_sta_init, esp_wifi_sta_deinit, esp_wifi_sta_is_initialized },
 };
 
@@ -89,6 +90,16 @@ static esp_err_t parse_bool_token(const char *value, bool *out)
         return ESP_OK;
     }
     return ESP_ERR_INVALID_ARG;
+}
+
+static bool parse_u32_token(const char *value, uint32_t *out)
+{
+    if (value == NULL || out == NULL) return false;
+    char *end = NULL;
+    unsigned long parsed = strtoul(value, &end, 0);
+    if (end == value || *end != '\0' || parsed > UINT32_MAX) return false;
+    *out = (uint32_t)parsed;
+    return true;
 }
 
 static esp_err_t register_at_commands(void);
@@ -183,6 +194,14 @@ esp_err_t esp_runtime_enable(esp_runtime_module_t module, bool log_enabled, bool
 
     esp_err_t err = desc->init_fn(log_enabled, at_enabled);
     if (err != ESP_OK) return err;
+
+    if (module == ESP_RUNTIME_MODULE_PCA9685) {
+        err = esp_pca9685_configure_default();
+        if (err != ESP_OK) {
+            (void)desc->deinit_fn();
+            return err;
+        }
+    }
 
     s_runtime.module_log_enabled[module] = log_enabled;
     s_runtime.module_at_enabled[module] = at_enabled;
@@ -280,11 +299,15 @@ static void handle_at_runtime_query(const char *param)
 static void handle_at_runtime(const char *param)
 {
     if (param == NULL || param[0] == '\0') {
-        AT(R "ERROR: use AT+ESP=<MODULE>,STATUS|ENABLE[,LOG,AT]|DISABLE");
+        AT(R "ERROR: use AT+ESP=<MODULE>,STATUS|ENABLE[,LOG,AT]|DISABLE or AT+ESP=I2C_MASTER,<SDA>,<SCL>,<HZ>");
         return;
     }
 
     char work[128];
+    if (strlen(param) >= sizeof(work)) {
+        AT(R "ERROR: comando muito longo");
+        return;
+    }
     strncpy(work, param, sizeof(work) - 1U);
     work[sizeof(work) - 1U] = '\0';
 
@@ -298,7 +321,7 @@ static void handle_at_runtime(const char *param)
     }
 
     if (token_count < 2) {
-        AT(R "ERROR: use AT+ESP=<MODULE>,STATUS|ENABLE[,LOG,AT]|DISABLE");
+        AT(R "ERROR: use AT+ESP=<MODULE>,STATUS|ENABLE[,LOG,AT]|DISABLE or AT+ESP=I2C_MASTER,<SDA>,<SCL>,<HZ>");
         return;
     }
 
@@ -319,6 +342,38 @@ static void handle_at_runtime(const char *param)
             AT(R "ERROR: disable failed (%s)", esp_err_to_name(err));
             return;
         }
+        AT(G "OK");
+        return;
+    }
+
+    if (module == ESP_RUNTIME_MODULE_I2C_MASTER && token_count == 4) {
+        uint32_t sda = 0;
+        uint32_t scl = 0;
+        uint32_t hz = 0;
+        if (!parse_u32_token(tokens[1], &sda) || !parse_u32_token(tokens[2], &scl) || !parse_u32_token(tokens[3], &hz)) {
+            AT(R "ERROR: parametro invalido");
+            return;
+        }
+
+        esp_err_t err = esp_runtime_enable(module, false, true);
+        if (err != ESP_OK) {
+            AT(R "ERROR: enable failed (%s)", esp_err_to_name(err));
+            return;
+        }
+
+        esp_i2c_master_config_t cfg = {
+            .port_num = 0,
+            .sda_gpio_num = (int)sda,
+            .scl_gpio_num = (int)scl,
+            .clock_hz = hz,
+        };
+        err = esp_i2c_master_configure(&cfg);
+        if (err != ESP_OK) {
+            (void)esp_runtime_disable(module);
+            AT(R "ERROR: cfg failed (%s)", esp_err_to_name(err));
+            return;
+        }
+
         AT(G "OK");
         return;
     }
